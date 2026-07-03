@@ -33,13 +33,16 @@ LIVE_NUMBERS = {
     "MM": [], "GH": [], "TJ": [], "SE": [], "UK": []
 }
 
-# ----------------- মেম্বারশিপ চেক করার ফাংশন -----------------
+# ----------------- 🛠️ ফিক্সড মেম্বারশিপ চেক করার ফাংশন -----------------
 async def check_subscription(user_id: int) -> bool:
     try:
         member1 = await bot.get_chat_member(chat_id=CHANNEL_1, user_id=user_id)
         member2 = await bot.get_chat_member(chat_id=CHANNEL_2, user_id=user_id)
-        banned_statuses = ["left", "kicked"]
-        if member1.status not in banned_statuses and member2.status not in banned_statuses:
+        
+        # সফল মেম্বারশিপের জন্য এই স্ট্যাটাসগুলো থাকতে হবে
+        allowed_statuses = ["member", "administrator", "creator"]
+        
+        if member1.status in allowed_statuses and member2.status in allowed_statuses:
             return True
     except Exception as e:
         logging.error(f"Subscription check error: {e}")
@@ -247,6 +250,7 @@ async def check_otp_status(call: types.CallbackQuery):
     ])
     await call.message.edit_text(user_display, reply_markup=keyboard, parse_mode="Markdown")
 
+# 🛠️ ফিক্সড ফাংশন: 'message' এরর দূর করা হয়েছে
 @dp.callback_query(F.data == "back_main")
 async def back_main(call: types.CallbackQuery):
     await call.message.delete()
@@ -314,7 +318,7 @@ async def close_admin(call: types.CallbackQuery):
     if call.from_user.id != ADMIN_ID: return
     await call.message.delete()
 
-# 🛠️ ফিক্সড হ্যান্ডলার: এটি শুধুমাত্র অ্যাডমিন অ্যাকশনে থাকা অবস্থায় রান করবে এবং সাধারণ ইউজারের স্টার্ট লক করবে না
+# অ্যাডমিন ইনপুট হ্যান্ডলার
 @dp.message(F.text, lambda message: message.from_user.id == ADMIN_ID and message.from_user.id in admin_state)
 async def handle_admin_inputs(message: types.Message):
     user_id = message.from_user.id
@@ -370,7 +374,6 @@ async def handle_admin_inputs(message: types.Message):
 
 # ----------------- বট এবং টাস্ক একসাথে রান করা -----------------
 async def main():
-    # ব্যাকগ্রাউন্ড টাস্ক এবং পোলিং সরাসরি গ্লোবাল লুপের সাথে সিঙ্ক করা হলো
     asyncio.create_task(fetch_live_numbers_from_sources())
     await dp.start_polling(bot)
 
