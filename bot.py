@@ -6,7 +6,7 @@ from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 
 # 🛑 গুরুত্বপূর্ণ সেটিংস (আপনার তথ্য বসান)
-BOT_TOKEN = "8598140667:AAG8EyUZ-3KWsldsYACVukx7qOAhiWVg6As"
+BOT_TOKEN = "8931384031:AAElSwSOL_CQdShaUgvwEBenkdmJPkiXZUc"
 ADMIN_ID = 7810882848  # আপনার টেলিগ্রাম ইউজার আইডি
 
 # 📢 চ্যানেল সেটিংস
