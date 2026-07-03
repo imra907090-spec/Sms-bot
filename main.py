@@ -101,7 +101,6 @@ async def auto_group_scraper(client, message):
     global LIVE_NUMBERS
     text_content = ""
 
-    # যদি ফাইল আপলোড করা হয় (.txt)
     if message.document and message.document.file_name.endswith('.txt'):
         try:
             file_path = await message.download()
@@ -109,34 +108,28 @@ async def auto_group_scraper(client, message):
                 text_content = f.read()
         except Exception as e:
             logging.error(f"Scraper file download error: {e}")
-    # যদি টেক্সট মেসেজ হয়
     elif message.text:
         text_content = message.text
 
     if not text_content:
         return
 
-    # মেসেজ বা টেক্সট ফাইল থেকে শুধু প্লাসসহ বা প্লাস ছাড়া সব ধরণের ফোন নাম্বার খুঁজে বের করা
     found_numbers = re.findall(r'\+?\d{9,15}', text_content)
     
     scraped_count = 0
     for num in found_numbers:
-        # নাম্বার ফরম্যাট ঠিক করা (প্লাস চিহ্ন না থাকলে যোগ করে নেওয়া)
         clean_num = num if num.startswith('+') else f"+{num}"
-        digits_only = clean_num.replace('+', '') # শুধুমাত্র সংখ্যা চেক করার জন্য
+        digits_only = clean_num.replace('+', '')
         
         target_country = None
-        
-        # ডায়াল কোড চেক করে দেশ নির্ধারণ করা হচ্ছে (৩ ডিজিট থেকে শুরু করে ২ ডিজিট চেক করবে)
         for prefix in sorted(COUNTRY_PREFIXES.keys(), key=len, reverse=True):
             if digits_only.startswith(prefix):
                 target_country = COUNTRY_PREFIXES[prefix]
                 break
         
-        # যদি আপনার লিস্টের কোনো দেশের সাথে ম্যাচ করে, তবে নির্দিষ্ট বক্সে সাজিয়ে রাখবে
         if target_country and target_country in LIVE_NUMBERS:
             if clean_num not in LIVE_NUMBERS[target_country]:
-                LIVE_NUMBERS[target_country].insert(0, clean_num) # নতুন নাম্বার বটের লিস্টের সবার উপরে যাবে
+                LIVE_NUMBERS[target_country].insert(0, clean_num)
                 scraped_count += 1
 
     if scraped_count > 0:
@@ -433,15 +426,23 @@ async def handle_admin_inputs(message: types.Message):
         await message.answer(f"✅ **Global transmission successful!** Pushed to `{count}` active clients.", parse_mode="Markdown")
         del admin_state[user_id]
 
-# ----------------- বট এবং স্ক্র্যাপার একসাথে রান করা -----------------
+# ----------------- 🛠️ সেফ রান গেটওয়ে (FIXED) -----------------
 async def main():
-    # ব্যাকগ্রাউন্ড টাস্ক চালু করা
+    # এপিআই ব্যাকগ্রাউন্ড টাস্ক চালু করা
     asyncio.create_task(fetch_live_numbers_from_sources())
     
-    # ইউজারবট চালু করা
-    await userbot.start() 
+    # 🛑 রেলওয়ে এরর প্রোটেকশন লজিক
+    try:
+        logging.info("Attempting to initialize Pyrogram Scraper Client...")
+        await userbot.start() 
+        logging.info("Pyrogram Scraper Client successfully established!")
+    except EOFError:
+        # যদি সেশন ফাইল না থাকে এবং সার্ভার ইনপুট চায়, তবে ক্র্যাশ না করে স্কিপ করবে
+        logging.warning("⚠️ Railway Terminal Input Blocked! Skipping Scraper initialization. Main bot will remain ACTIVE.")
+    except Exception as e:
+        logging.error(f"Failed to start Pyrogram Scraper: {e}. Moving forward to start main bot.")
     
-    # মেইন বট পোলিং চালু করা
+    # মেইন টেলিগ্রাম বটের পোলিং চালু করা (এটি সবসময় সচল থাকবে)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
