@@ -40,18 +40,25 @@ users_list = set()
 banned_users = set()
 admin_state = {} 
 
-# রিয়েল-টাইম নাম্বারের গ্লোবাল ক্যাশ
-LIVE_NUMBERS = {
-    "MM": [], "GH": [], "TJ": [], "SE": [], "UK": []
-}
+# 🔄 রিয়েল-টাইম নাম্বারের ডাইনামিক গ্লোবাল ক্যাশ (শুরুতে একদম খালি থাকবে)
+LIVE_NUMBERS = {}
 
-# 🗺️ ফোন নাম্বারের ডায়াল কোড অনুযায়ী দেশ চেনার ম্যাপ ডিকশনারি
-COUNTRY_PREFIXES = {
-    "95": "MM",   # Myanmar (+95)
-    "233": "GH",  # Ghana (+233)
-    "992": "TJ",  # Tajikistan (+992)
-    "46": "SE",   # Sweden (+46)
-    "44": "UK"    # United Kingdom (+44)
+# 🗺️ গ্লোবাল ডায়াল কোড অনুসারে দেশের নাম ও ফ্ল্যাগের ডিকশনারি (প্রয়োজনে এটি অটোমেটিক কাজ করবে)
+COUNTRY_MAP = {
+    "95": {"code": "MM", "name": "Myanmar 🇲🇲"},
+    "233": {"code": "GH", "name": "Ghana 🇬🇭"},
+    "992": {"code": "TJ", "name": "Tajikistan 🇹🇯"},
+    "46": {"code": "SE", "name": "Sweden 🇸🇪"},
+    "44": {"code": "UK", "name": "United Kingdom 🇬🇧"},
+    "1": {"code": "US", "name": "USA 🇺🇸"},
+    "7": {"code": "RU", "name": "Russia 🇷🇺"},
+    "91": {"code": "IN", "name": "India 🇮🇳"},
+    "880": {"code": "BD", "name": "Bangladesh 🇧🇩"},
+    "60": {"code": "MY", "name": "Malaysia 🇲🇲"},
+    "62": {"code": "ID", "name": "Indonesia 🇮🇩"},
+    "33": {"code": "FR", "name": "France 🇫🇷"},
+    "49": {"code": "DE", "name": "Germany 🇩🇪"},
+    "31": {"code": "NL", "name": "Netherlands 🇳🇱"}
 }
 
 # ----------------- 🛠️ ফিক্সড মেম্বারশিপ চেক করার ফাংশন -----------------
@@ -84,7 +91,10 @@ async def fetch_live_numbers_from_sources():
                             if isinstance(data, dict):
                                 for country, numbers in data.items():
                                     country_upper = country.upper()
-                                    if country_upper in LIVE_NUMBERS and isinstance(numbers, list):
+                                    if isinstance(numbers, list) and numbers:
+                                        if country_upper not in LIVE_NUMBERS:
+                                            LIVE_NUMBERS[country_upper] = []
+                                        
                                         fresh_list = []
                                         for num in numbers:
                                             if num not in fresh_list:
@@ -95,7 +105,7 @@ async def fetch_live_numbers_from_sources():
                     logging.error(f"Error fetching live numbers from {current_api}: {e}")
         await asyncio.sleep(300)
 
-# ----------------- 🛰️ স্বয়ংক্রিয় গ্রুপ/চ্যানেল স্ক্র্যাপার লজিক (FIXED) -----------------
+# ----------------- 🛰️ স্বয়ংক্রিয় ডাইনামিক স্ক্র্যাপার লজিক (UPDATED) -----------------
 @userbot.on_message(pyro_filters.chat(TARGET_SOURCE_CHAT) & (pyro_filters.text | pyro_filters.document))
 async def auto_group_scraper(client, message):
     global LIVE_NUMBERS
@@ -121,19 +131,28 @@ async def auto_group_scraper(client, message):
         clean_num = num if num.startswith('+') else f"+{num}"
         digits_only = clean_num.replace('+', '')
         
-        target_country = None
-        for prefix in sorted(COUNTRY_PREFIXES.keys(), key=len, reverse=True):
-            if digits_only.startswith(prefix):
-                target_country = COUNTRY_PREFIXES[prefix]
-                break
+        target_country = "UNKNOWN"
         
-        if target_country and target_country in LIVE_NUMBERS:
-            if clean_num not in LIVE_NUMBERS[target_country]:
-                LIVE_NUMBERS[target_country].insert(0, clean_num)
-                scraped_count += 1
+        # ৩ ডিজিট থেকে শুরু করে ডায়াল কোড চেক করা হচ্ছে
+        for prefix in sorted(COUNTRY_MAP.keys(), key=len, reverse=True):
+            if digits_only.startswith(prefix):
+                target_country = COUNTRY_MAP[prefix]["code"]
+                break
+                
+        # যদি জানা ডায়াল কোড না হয়, তবে নাম্বারের প্রথম ২ ডিজিটকেই দেশ হিসেবে ধরে নেবে (ডাইনামিক সিস্টেম)
+        if target_country == "UNKNOWN":
+            target_country = digits_only[:2].upper()
+        
+        # ডাইনামিকালি ডিকশনারিতে দেশের মেমোরি তৈরি করা
+        if target_country not in LIVE_NUMBERS:
+            LIVE_NUMBERS[target_country] = []
+            
+        if clean_num not in LIVE_NUMBERS[target_country]:
+            LIVE_NUMBERS[target_country].insert(0, clean_num)
+            scraped_count += 1
 
     if scraped_count > 0:
-        logging.info(f"Successfully scraped & sorted {scraped_count} numbers into their respective country list!")
+        logging.info(f"Successfully scraped & sorted {scraped_count} numbers into dynamic lists!")
 
 # ----------------- কীবোর্ড বাটন সমূহ -----------------
 def main_reply_keyboard():
@@ -153,23 +172,36 @@ def force_join_keyboard():
         [InlineKeyboardButton(text="🔄 Verify Membership", callback_data="check_verify")]
     ])
 
-def filtered_country_keyboard():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="🇲🇲 Myanmar", callback_data="get_num_MM"),
-            InlineKeyboardButton(text="🇬🇭 Ghana", callback_data="get_num_GH")
-        ],
-        [
-            InlineKeyboardButton(text="🇹🇯 Tajikistan", callback_data="get_num_TJ"),
-            InlineKeyboardButton(text="🇸🇪 Sweden", callback_data="get_num_SE")
-        ],
-        [
-            InlineKeyboardButton(text="🇬🇧 United Kingdom", callback_data="get_num_UK")
-        ],
-        [
-            InlineKeyboardButton(text="◀️ Back to Menu", callback_data="back_main")
-        ]
-    ])
+# 🌍 ডাইনামিক কিবোর্ড জেনারেটর (যে দেশের নাম্বার থাকবে শুধু সেই দেশই শো করবে)
+def dynamic_country_keyboard():
+    keyboard_buttons = []
+    current_row = []
+    
+    # শুধুমাত্র যে দেশগুলোতে এই মুহূর্তে নাম্বার আছে, সেগুলো ফিল্টার করা হচ্ছে
+    active_countries = [country for country, numbers in LIVE_NUMBERS.items() if numbers]
+    
+    for country_code in active_countries:
+        # ম্যাপ থেকে সুন্দর নাম খোঁজা, না পাওয়া গেলে সরাসরি কোডটাই শো করবে
+        display_name = country_code
+        for prefix, info in COUNTRY_MAP.items():
+            if info["code"] == country_code:
+                display_name = info["name"]
+                break
+                
+        button = InlineKeyboardButton(text=display_name, callback_data=f"get_num_{country_code}")
+        current_row.append(button)
+        
+        # প্রতি লাইনে ২টি করে বাটন রাখা হবে
+        if len(current_row) == 2:
+            keyboard_buttons.append(current_row)
+            current_row = []
+            
+    if current_row:
+        keyboard_buttons.append(current_row)
+        
+    # ব্যাক বাটন যোগ করা
+    keyboard_buttons.append([InlineKeyboardButton(text="◀️ Back to Menu", callback_data="back_main")])
+    return InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
 
 def admin_inline_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -233,7 +265,14 @@ async def show_countries(message: types.Message):
     if not await check_subscription(message.from_user.id):
         await message.answer("⚠️ **Access Expired! Please re-verify your channel membership.**", reply_markup=force_join_keyboard())
         return
-    await message.answer("🌍 **SELECT TARGET COUNTRY FROM THE LIST:**\n*Choose the country line you want to allocate:*", reply_markup=filtered_country_keyboard(), parse_mode="Markdown")
+        
+    # যদি মেমোরিতে কোনো নাম্বারই না থাকে
+    active_countries = [c for c, n in LIVE_NUMBERS.items() if n]
+    if not active_countries:
+        await message.answer("❌ **এই মুহূর্তে সিস্টেমে কোনো সচল নাম্বার নেই!**\n*চ্যানেলে নতুন নাম্বার রিলিজ হওয়া পর্যন্ত অপেক্ষা করুন।*")
+        return
+        
+    await message.answer("🌍 **SELECT TARGET COUNTRY FROM THE LIST:**\n*Choose the country line you want to allocate:*", reply_markup=dynamic_country_keyboard(), parse_mode="Markdown")
 
 @dp.callback_query(F.data.startswith("get_num_"))
 async def process_filtered_number(call: types.CallbackQuery):
@@ -242,7 +281,14 @@ async def process_filtered_number(call: types.CallbackQuery):
         return
 
     country_code = call.data.split("_")[2]
-    country_names = {"MM": "Myanmar 🇲🇲", "GH": "Ghana 🇬🇭", "TJ": "Tajikistan 🇹🇯", "SE": "Sweden 🇸🇪", "UK": "United Kingdom 🇬🇧"}
+    
+    # সুন্দর নাম খোঁজা
+    country_name = country_code
+    for prefix, info in COUNTRY_MAP.items():
+        if info["code"] == country_code:
+            country_name = info["name"]
+            break
+            
     available_numbers = LIVE_NUMBERS.get(country_code, [])
     
     if available_numbers:
@@ -250,7 +296,7 @@ async def process_filtered_number(call: types.CallbackQuery):
         response_text = (
             f"💎 **VIRTUAL NUMBER ALLOCATED** 💎\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"🌍 **Country:** {country_names[country_code]}\n"
+            f"🌍 **Country:** {country_name}\n"
             f"📱 **Number:** `{selected_number}`\n"
             f"⚙️ **Status:** Ready for Activation\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -262,7 +308,7 @@ async def process_filtered_number(call: types.CallbackQuery):
         ])
         await call.message.edit_text(response_text, reply_markup=keyboard, parse_mode="Markdown")
     else:
-        await call.message.edit_text(f"❌ **No fresh numbers available for {country_names[country_code]} right now.**\n*Our background daemon syncs every 5 minutes. Try another region or retry later!*", reply_markup=filtered_country_keyboard(), parse_mode="Markdown")
+        await call.message.edit_text(f"❌ **No fresh numbers available for {country_name} right now.**", reply_markup=dynamic_country_keyboard(), parse_mode="Markdown")
 
 @dp.callback_query(F.data.startswith("check_"))
 async def check_otp_status(call: types.CallbackQuery):
@@ -395,11 +441,14 @@ async def handle_admin_inputs(message: types.Message):
                 c_code, phone_num = part.split(":", 1)
                 c_code = c_code.strip().upper()
                 phone_num = phone_num.strip()
-                if c_code in LIVE_NUMBERS:
-                    if phone_num not in LIVE_NUMBERS[c_code]:
-                        LIVE_NUMBERS[c_code].insert(0, phone_num)
+                
+                # ডাইনামিকালি এড করার পারমিশন দেওয়া হলো
+                if c_code not in LIVE_NUMBERS:
+                    LIVE_NUMBERS[c_code] = []
+                    
+                if phone_num not in LIVE_NUMBERS[c_code]:
+                    LIVE_NUMBERS[c_code].insert(0, phone_num)
                     added_count += 1
-                else: failed_lines.append(part)
             else:
                 if part: failed_lines.append(part)
         status_msg = f"✅ **Successfully processed `{added_count}` virtual lines.**"
@@ -426,23 +475,19 @@ async def handle_admin_inputs(message: types.Message):
         await message.answer(f"✅ **Global transmission successful!** Pushed to `{count}` active clients.", parse_mode="Markdown")
         del admin_state[user_id]
 
-# ----------------- 🛠️ সেফ রান গেটওয়ে (FIXED) -----------------
+# ----------------- 🛠️ সেফ রান গেটওয়ে -----------------
 async def main():
-    # এপিআই ব্যাকগ্রাউন্ড টাস্ক চালু করা
     asyncio.create_task(fetch_live_numbers_from_sources())
     
-    # 🛑 রেলওয়ে এরর প্রোটেকশন লজিক
     try:
         logging.info("Attempting to initialize Pyrogram Scraper Client...")
         await userbot.start() 
         logging.info("Pyrogram Scraper Client successfully established!")
     except EOFError:
-        # যদি সেশন ফাইল না থাকে এবং সার্ভার ইনপুট চায়, তবে ক্র্যাশ না করে স্কিপ করবে
         logging.warning("⚠️ Railway Terminal Input Blocked! Skipping Scraper initialization. Main bot will remain ACTIVE.")
     except Exception as e:
         logging.error(f"Failed to start Pyrogram Scraper: {e}. Moving forward to start main bot.")
     
-    # মেইন টেলিগ্রাম বটের পোলিং চালু করা (এটি সবসময় সচল থাকবে)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
