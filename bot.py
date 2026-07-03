@@ -15,7 +15,7 @@ CONFIG = {
     "CHANNEL_2": "@Cyber_Shield_official",         
     "OTP_CHANNEL": "@Cyber_Shield_official",     
     "FIREBASE_JSON_PATH": "path/to/your/firebase-adminsdk.json", 
-    "FIREBASE_DB_URL": "https://your-database-name.firebaseio.com/" 
+    "FIREBASE_DB_URL": "https://smsbot-c871c-default-rtdb.firebaseio.com/" 
 }
 
 # ----------------- 🛠️ ফায়ারবেস কমপ্লিট সেটআপ -----------------
