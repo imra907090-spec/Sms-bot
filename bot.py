@@ -314,7 +314,7 @@ async def close_admin(call: types.CallbackQuery):
     if call.from_user.id != ADMIN_ID: return
     await call.message.delete()
 
-# 🛠️ ফিক্সড হ্যান্ডলার: এটি শুধুমাত্র অ্যাডমিন অ্যাকশনে থাকা অবস্থায় রান করবে
+# 🛠️ ফিক্সড হ্যান্ডলার: এটি শুধুমাত্র অ্যাডমিন অ্যাকশনে থাকা অবস্থায় রান করবে এবং সাধারণ ইউজারের স্টার্ট লক করবে না
 @dp.message(F.text, lambda message: message.from_user.id == ADMIN_ID and message.from_user.id in admin_state)
 async def handle_admin_inputs(message: types.Message):
     user_id = message.from_user.id
@@ -357,7 +357,7 @@ async def handle_admin_inputs(message: types.Message):
         
         await message.answer(f"✅ **Configuration Matrix Updated!**\n`Source {source_num}` is now rerouted to: `{user_input}`", parse_mode="Markdown")
         del admin_state[user_id]
-        
+    
     elif current_action == "waiting_for_broadcast":
         count = 0
         for u in users_list:
@@ -370,8 +370,10 @@ async def handle_admin_inputs(message: types.Message):
 
 # ----------------- বট এবং টাস্ক একসাথে রান করা -----------------
 async def main():
+    # ব্যাকগ্রাউন্ড টাস্ক এবং পোলিং সরাসরি গ্লোবাল লুপের সাথে সিঙ্ক করা হলো
     asyncio.create_task(fetch_live_numbers_from_sources())
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
+    logging.info("Starting Telegram Bot Application Pool...")
     asyncio.run(main())
