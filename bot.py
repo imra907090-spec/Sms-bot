@@ -102,7 +102,7 @@ def filtered_country_keyboard():
         ]
     ])
 
-# প্রফেশনাল ইনলাইন অ্যাডমিন মেনু (নতুন বাটন যুক্ত করা হয়েছে)
+# প্রফেশনাল ইনলাইন অ্যাডমিন মেনু
 def admin_inline_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="➕ Add Numbers Manually", callback_data="admin_add_numbers")],
@@ -314,13 +314,10 @@ async def close_admin(call: types.CallbackQuery):
     if call.from_user.id != ADMIN_ID: return
     await call.message.delete()
 
-# অ্যাডমিন চ্যাটে টেক্সট ইনপুট দিলে তা প্রসেস করার হ্যান্ডলার
-@dp.message(F.text)
+# 🛠️ ফিক্সড হ্যান্ডলার: এটি শুধুমাত্র অ্যাডমিন অ্যাকশনে থাকা অবস্থায় রান করবে
+@dp.message(F.text, lambda message: message.from_user.id == ADMIN_ID and message.from_user.id in admin_state)
 async def handle_admin_inputs(message: types.Message):
     user_id = message.from_user.id
-    if user_id != ADMIN_ID or user_id not in admin_state:
-        return # ইউজার সাধারণ টেক্সট পাঠালে কিছু করবে না
-        
     current_action = admin_state[user_id]
     user_input = message.text.strip()
     global API_SOURCE_1, API_SOURCE_2, API_SOURCE_3
@@ -329,7 +326,6 @@ async def handle_admin_inputs(message: types.Message):
         added_count = 0
         failed_lines = []
         
-        # ইনপুট প্রসেস করা (কমা দিয়ে ভাগ করে রেঞ্জ বা লিস্ট হ্যান্ডল করা)
         parts = [p.strip() for p in user_input.split(",")]
         for part in parts:
             if ":" in part:
@@ -339,7 +335,7 @@ async def handle_admin_inputs(message: types.Message):
                 
                 if c_code in LIVE_NUMBERS:
                     if phone_num not in LIVE_NUMBERS[c_code]:
-                        LIVE_NUMBERS[c_code].insert(0, phone_num) # নতুন নাম্বারটি সবার আগে পুশ হবে
+                        LIVE_NUMBERS[c_code].insert(0, phone_num)
                     added_count += 1
                 else:
                     failed_lines.append(part)
